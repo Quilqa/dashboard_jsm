@@ -202,6 +202,9 @@ const fmtP = new Intl.NumberFormat('ru-RU',{maximumFractionDigits:1});
 const uniq = a => [...new Set(a)];
 const NEED = ['Date','Conssegm','Fil','plan','fact','plan_full','fact_full'];
 
+const fmtK = new Intl.NumberFormat('ru-RU',{maximumFractionDigits:1});
+const kfmt = v => fmtK.format(v/1000) + ' тыс';
+
 function b64ToBytes(b64){ const bin = atob(b64); const out = new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) out[i]=bin.charCodeAt(i); return out; }
 function splitCSVLine(line, delim){
   const out=[]; let cur='', q=false;
@@ -371,6 +374,12 @@ function buildTree(rows){
   });
 }
 
+function cellText(metricKey, v){
+  if (v == null) return '—';
+  if (metricKey === 'pct' || metricKey === 'pct_full') return fmtP.format(v) + '%';
+  return kfmt(v); // всё остальное (план/факт/дельты и кумулятивы) — в тыс
+}
+
 /* ===== Рендер ===== */
 function render(){
   const rows = applyFilter(data);
@@ -387,20 +396,33 @@ function render(){
 
   function push(node){
     const tr=document.createElement('tr');
-    const td=document.createElement('td'); const rc=document.createElement('div'); rc.className='rowcell';
-    for(let i=0;i<node.level;i++){ const ind=document.createElement('span'); ind.className='indent'; rc.appendChild(ind); }
-    const t=document.createElement('span'); t.className='toggle'+(node.children.length?'':' blank');
+    const td=document.createElement('td'); 
+    const rc=document.createElement('div'); 
+    rc.className='rowcell';
+    for(let i=0;i<node.level;i++){ 
+        const ind=document.createElement('span'); 
+        ind.className='indent'; 
+        rc.appendChild(ind); 
+    }
+    const t=document.createElement('span'); 
+    t.className='toggle'+(node.children.length?'':' blank');
     t.textContent = state.collapsed.has(node.path)? '+' : '–';
     if(node.children.length){
       t.onclick = ()=>{ if(state.collapsed.has(node.path)) state.collapsed.delete(node.path); else state.collapsed.add(node.path); render(); };
     }
-    rc.appendChild(t); const lbl=document.createElement('span'); lbl.textContent=node.label; rc.appendChild(lbl);
-    td.appendChild(rc); tr.appendChild(td);
+    rc.appendChild(t); 
+    const lbl=document.createElement('span'); 
+    lbl.textContent=node.label; 
+    rc.appendChild(lbl);
+    td.appendChild(rc); 
+    tr.appendChild(td);
 
-    for(const m of metrics){
-      const v=node.total[m.k]; const c=document.createElement('td'); c.className='num';
-      c.textContent = (m.k==='pct' || m.k==='pct_full') ? (v==null?'—':fmtP.format(v)+'%') : (v==null?'—':fmt.format(v));
-      paint(c,m.k,v); tr.appendChild(c);
+    for (const m of metrics) {
+      const v = node.total[m.k];
+      const c = document.createElement('td'); c.className='num';
+      c.textContent = cellText(m.k, v);
+      paint(c, m.k, v);
+      tr.appendChild(c);
     }
     DOM.tbody.appendChild(tr);
     if(node.children.length && !state.collapsed.has(node.path)) node.children.forEach(push);
